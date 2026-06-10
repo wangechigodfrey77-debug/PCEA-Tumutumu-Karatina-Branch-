@@ -130,8 +130,8 @@ export async function seedDatabaseIfEmpty() {
   // 4. Pharmacy Items
   try {
     const stockSnap = await getDocs(collection(db, 'pharmacyItems'));
-    if (stockSnap.size < 5 || shouldForceUpgrade) {
-      console.log('Seeding pharmacyItems to Firestore...');
+    if (stockSnap.size < 300 || shouldForceUpgrade) {
+      console.log('Seeding full pharmacyItems list (' + defaultPharmacyStock.length + ' items) with real balances to Firestore...');
       const batch = writeBatch(db);
       defaultPharmacyStock.forEach((pi) => {
         const d = doc(db, 'pharmacyItems', pi.id);
