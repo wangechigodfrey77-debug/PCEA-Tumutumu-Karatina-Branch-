@@ -41,6 +41,13 @@ import {
 // This allows reviewers to immediately see data populate in Firestore!
 // -------------------------------------------------------------
 export async function seedDatabaseIfEmpty() {
+  // 0. Double-guard: if local browser storage has already locked into production mode, skip seeding entirely
+  const localIsProd = typeof window !== 'undefined' && localStorage.getItem('hosp_is_production_live') === 'true';
+  if (localIsProd) {
+    console.log('Local storage production lock detected. Skipping automatic database seeding.');
+    return;
+  }
+
   // Check if system config dictates production mode
   try {
     const configSnap = await getDocs(collection(db, 'system_config'));
@@ -52,6 +59,9 @@ export async function seedDatabaseIfEmpty() {
     });
     if (isProd) {
       console.log('System is in Live Production Mode. Skipping automatic database seeding.');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hosp_is_production_live', 'true');
+      }
       // Seed default Whitelist if completely absent so Admin can log in
       const wlSnap = await getDocs(collection(db, 'whitelist'));
       if (wlSnap.empty) {
@@ -83,10 +93,44 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (whitelist): ', err?.message || err);
   }
 
-  // 2. Pharmacy Items (Preserved & seeded as essential catalogue)
+  // 2. Patients & cascading datasets
+  let shouldForceUpgrade = false;
+  try {
+    const patSnap = await getDocs(collection(db, 'patients'));
+    if (patSnap.size < 15) {
+      shouldForceUpgrade = true;
+      console.log('Fewer than 15 patients found, seeding full 30-patient dataset...');
+      const batch = writeBatch(db);
+      defaultPatients.forEach((p) => {
+        const d = doc(db, 'patients', p.id);
+        batch.set(d, p);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (patients): ', err?.message || err);
+  }
+
+  // 3. Lab Tests
+  try {
+    const labSnap = await getDocs(collection(db, 'labTests'));
+    if (labSnap.size < 8 || shouldForceUpgrade) {
+      console.log('Seeding labTests to Firestore...');
+      const batch = writeBatch(db);
+      defaultLabTests.forEach((t) => {
+        const d = doc(db, 'labTests', t.id);
+        batch.set(d, t);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (labTests): ', err?.message || err);
+  }
+
+  // 4. Pharmacy Items
   try {
     const stockSnap = await getDocs(collection(db, 'pharmacyItems'));
-    if (stockSnap.size < 5) {
+    if (stockSnap.size < 5 || shouldForceUpgrade) {
       console.log('Seeding pharmacyItems to Firestore...');
       const batch = writeBatch(db);
       defaultPharmacyStock.forEach((pi) => {
@@ -99,7 +143,103 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (pharmacyItems): ', err?.message || err);
   }
 
-  // 3. Lab Catalog (Infrastructural services catalog)
+  // 5. Medication Dispenses
+  try {
+    const dispSnap = await getDocs(collection(db, 'medicationDispenses'));
+    if (dispSnap.size < 8 || shouldForceUpgrade) {
+      console.log('Seeding medicationDispenses to Firestore...');
+      const batch = writeBatch(db);
+      defaultDispenses.forEach((md) => {
+        const d = doc(db, 'medicationDispenses', md.id);
+        batch.set(d, md);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (medicationDispenses): ', err?.message || err);
+  }
+
+  // 6. Duty Allocations
+  try {
+    const dutySnap = await getDocs(collection(db, 'dutyAllocations'));
+    if (dutySnap.empty) {
+      console.log('Seeding dutyAllocations to Firestore...');
+      const batch = writeBatch(db);
+      defaultDutyAllocations.forEach((da) => {
+        const d = doc(db, 'dutyAllocations', da.id);
+        batch.set(d, da);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (dutyAllocations): ', err?.message || err);
+  }
+
+  // 7. Leave Requests
+  try {
+    const leaveSnap = await getDocs(collection(db, 'leaveRequests'));
+    if (leaveSnap.empty) {
+      console.log('Seeding leaveRequests to Firestore...');
+      const batch = writeBatch(db);
+      defaultLeaveRequests.forEach((req) => {
+        const d = doc(db, 'leaveRequests', req.id);
+        batch.set(d, req);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (leaveRequests): ', err?.message || err);
+  }
+
+  // 8. Messages
+  try {
+    const msgSnap = await getDocs(collection(db, 'messages'));
+    if (msgSnap.empty) {
+      console.log('Seeding messages to Firestore...');
+      const batch = writeBatch(db);
+      defaultMessages.forEach((m) => {
+        const d = doc(db, 'messages', m.id);
+        batch.set(d, m);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (messages): ', err?.message || err);
+  }
+
+  // 9. Appointments
+  try {
+    const apptSnap = await getDocs(collection(db, 'appointments'));
+    if (apptSnap.size < 6 || shouldForceUpgrade) {
+      console.log('Seeding appointments to Firestore...');
+      const batch = writeBatch(db);
+      defaultAppointments.forEach((ap) => {
+        const d = doc(db, 'appointments', ap.id);
+        batch.set(d, ap);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (appointments): ', err?.message || err);
+  }
+
+  // 10. Expenses
+  try {
+    const expSnap = await getDocs(collection(db, 'expenses'));
+    if (expSnap.empty || shouldForceUpgrade) {
+      console.log('Seeding expenses to Firestore...');
+      const batch = writeBatch(db);
+      defaultExpenses.forEach((exp) => {
+        const d = doc(db, 'expenses', exp.id);
+        batch.set(d, exp);
+      });
+      await batch.commit();
+    }
+  } catch (err: any) {
+    console.warn('Silent seeding warning (expenses): ', err?.message || err);
+  }
+
+  // 11. Lab Catalog
   try {
     const lcSnap = await getDocs(collection(db, 'labCatalog'));
     if (lcSnap.empty) {
@@ -159,6 +299,10 @@ export async function forceResetToPristineSeeds() {
  * preserves only the authorized white list, and turns on the isProductionLive status flag.
  */
 export async function clearAllTestDataToGoLive() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('hosp_is_production_live', 'true');
+  }
+
   try {
     await setDoc(doc(db, 'system_config', 'status'), { isProductionLive: true });
     console.log('Production flag written to system_config/status');

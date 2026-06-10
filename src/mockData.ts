@@ -29,6 +29,7 @@ const getStored = <T>(key: string, defaultValue: T): T => {
   }
   if (isProd) {
     if (key === 'hosp_whitelist') return defaultWhitelist as unknown as T;
+    if (key === 'hosp_pharmacy_stock' || key === 'hosp_lab_catalog') return defaultValue;
     return [] as unknown as T;
   }
   return defaultValue;
@@ -1161,7 +1162,7 @@ export class HospitalDB {
   }
 
   static getPatients(): Patient[] {
-    return getStored<Patient[]>('hosp_patients', []);
+    return getStored<Patient[]>('hosp_patients', defaultPatients);
   }
 
   static savePatients(patients: Patient[]) {
@@ -1169,7 +1170,7 @@ export class HospitalDB {
   }
 
   static getLabTests(): LabTest[] {
-    return getStored<LabTest[]>('hosp_lab_tests', []);
+    return getStored<LabTest[]>('hosp_lab_tests', defaultLabTests);
   }
 
   static saveLabTests(tests: LabTest[]) {
@@ -1191,7 +1192,7 @@ export class HospitalDB {
   }
 
   static getDispenses(): MedicationDispense[] {
-    return getStored<MedicationDispense[]>('hosp_dispenses', []);
+    return getStored<MedicationDispense[]>('hosp_dispenses', defaultDispenses);
   }
 
   static saveDispenses(dispenses: MedicationDispense[]) {
@@ -1199,7 +1200,7 @@ export class HospitalDB {
   }
 
   static getDutyAllocations(): DutyAllocation[] {
-    return getStored<DutyAllocation[]>('hosp_duty_allocations', []);
+    return getStored<DutyAllocation[]>('hosp_duty_allocations', defaultDutyAllocations);
   }
 
   static saveDutyAllocations(dues: DutyAllocation[]) {
@@ -1207,7 +1208,7 @@ export class HospitalDB {
   }
 
   static getLeaveRequests(): LeaveRequest[] {
-    return getStored<LeaveRequest[]>('hosp_leave_requests', []);
+    return getStored<LeaveRequest[]>('hosp_leave_requests', defaultLeaveRequests);
   }
 
   static saveLeaveRequests(leaves: LeaveRequest[]) {
@@ -1215,7 +1216,7 @@ export class HospitalDB {
   }
 
   static getMessages(): Message[] {
-    return getStored<Message[]>('hosp_messages', []);
+    return getStored<Message[]>('hosp_messages', defaultMessages);
   }
 
   static saveMessages(messages: Message[]) {
@@ -1223,7 +1224,7 @@ export class HospitalDB {
   }
 
   static getAppointments(): Appointment[] {
-    return getStored<Appointment[]>('hosp_appointments', []);
+    return getStored<Appointment[]>('hosp_appointments', defaultAppointments);
   }
 
   static saveAppointments(appts: Appointment[]) {
@@ -1231,7 +1232,7 @@ export class HospitalDB {
   }
 
   static getExpenses(): Expense[] {
-    return getStored<Expense[]>('hosp_expenses', []);
+    return getStored<Expense[]>('hosp_expenses', defaultExpenses);
   }
 
   static saveExpenses(expenses: Expense[]) {
