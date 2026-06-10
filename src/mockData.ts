@@ -1161,7 +1161,7 @@ export class HospitalDB {
   }
 
   static getPatients(): Patient[] {
-    return getStored<Patient[]>('hosp_patients', defaultPatients);
+    return getStored<Patient[]>('hosp_patients', []);
   }
 
   static savePatients(patients: Patient[]) {
@@ -1169,7 +1169,7 @@ export class HospitalDB {
   }
 
   static getLabTests(): LabTest[] {
-    return getStored<LabTest[]>('hosp_lab_tests', defaultLabTests);
+    return getStored<LabTest[]>('hosp_lab_tests', []);
   }
 
   static saveLabTests(tests: LabTest[]) {
@@ -1178,8 +1178,8 @@ export class HospitalDB {
 
   static getPharmacyStock(): PharmacyItem[] {
     const stock = getStored<PharmacyItem[]>('hosp_pharmacy_stock', defaultPharmacyStock);
-    if (Array.isArray(stock) && stock.length <= 15) {
-      console.log('Upgraded state detected: Seeding complete P.C.E.A TumuTumu Hospital drug store list...');
+    if (!Array.isArray(stock) || stock.length === 0) {
+      console.log('Seeding complete P.C.E.A TumuTumu Hospital drug store list...');
       saveStored('hosp_pharmacy_stock', defaultPharmacyStock);
       return defaultPharmacyStock;
     }
@@ -1191,7 +1191,7 @@ export class HospitalDB {
   }
 
   static getDispenses(): MedicationDispense[] {
-    return getStored<MedicationDispense[]>('hosp_dispenses', defaultDispenses);
+    return getStored<MedicationDispense[]>('hosp_dispenses', []);
   }
 
   static saveDispenses(dispenses: MedicationDispense[]) {
@@ -1199,7 +1199,7 @@ export class HospitalDB {
   }
 
   static getDutyAllocations(): DutyAllocation[] {
-    return getStored<DutyAllocation[]>('hosp_duty_allocations', defaultDutyAllocations);
+    return getStored<DutyAllocation[]>('hosp_duty_allocations', []);
   }
 
   static saveDutyAllocations(dues: DutyAllocation[]) {
@@ -1207,7 +1207,7 @@ export class HospitalDB {
   }
 
   static getLeaveRequests(): LeaveRequest[] {
-    return getStored<LeaveRequest[]>('hosp_leave_requests', defaultLeaveRequests);
+    return getStored<LeaveRequest[]>('hosp_leave_requests', []);
   }
 
   static saveLeaveRequests(leaves: LeaveRequest[]) {
@@ -1215,7 +1215,7 @@ export class HospitalDB {
   }
 
   static getMessages(): Message[] {
-    return getStored<Message[]>('hosp_messages', defaultMessages);
+    return getStored<Message[]>('hosp_messages', []);
   }
 
   static saveMessages(messages: Message[]) {
@@ -1223,7 +1223,7 @@ export class HospitalDB {
   }
 
   static getAppointments(): Appointment[] {
-    return getStored<Appointment[]>('hosp_appointments', defaultAppointments);
+    return getStored<Appointment[]>('hosp_appointments', []);
   }
 
   static saveAppointments(appts: Appointment[]) {
@@ -1231,7 +1231,7 @@ export class HospitalDB {
   }
 
   static getExpenses(): Expense[] {
-    return getStored<Expense[]>('hosp_expenses', defaultExpenses);
+    return getStored<Expense[]>('hosp_expenses', []);
   }
 
   static saveExpenses(expenses: Expense[]) {
@@ -1269,7 +1269,7 @@ export class HospitalDB {
       localStorage.setItem('hosp_whitelist', JSON.stringify(defaultWhitelist));
       localStorage.setItem('hosp_patients', JSON.stringify([]));
       localStorage.setItem('hosp_lab_tests', JSON.stringify([]));
-      localStorage.setItem('hosp_pharmacy_stock', JSON.stringify([]));
+      localStorage.setItem('hosp_pharmacy_stock', JSON.stringify(defaultPharmacyStock));
       localStorage.setItem('hosp_dispenses', JSON.stringify([]));
       localStorage.setItem('hosp_duty_allocations', JSON.stringify([]));
       localStorage.setItem('hosp_leave_requests', JSON.stringify([]));

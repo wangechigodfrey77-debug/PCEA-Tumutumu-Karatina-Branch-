@@ -265,6 +265,31 @@ export function AdminDashboard({
 
         return (
           <div id="admin-finances-submodule" className="space-y-6">
+            {/* System Cleanse & Live Production Transition Panel */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                  <ShieldAlert className="w-5 h-5 text-amber-700 font-bold" />
+                  Transition Hospital System to Live Production Mode
+                </h3>
+                <p className="text-amber-800 text-xs max-w-2xl leading-relaxed">
+                  This action permanently removes all default test patients, fabricated clinical visits/notes, testing lab results, mock appointments, financial mock expenses, and local messages. 
+                  <strong className="text-amber-950 block mt-1"> The whitelisted staff accounts and your actual pharmacy stock list (with its complete medications catalogue) will be safely preserved.</strong>
+                </p>
+              </div>
+              <button
+                id="btn-admin-clear-data-go-live"
+                onClick={() => {
+                  if (confirm("CRITICAL WARNING: Are you sure you want to delete all test patients and transaction ledger data? Whitelisted logins and the pharmacy stock will be preserved. This action is irreversible.")) {
+                    onClearTestDataToGoLive?.();
+                  }
+                }}
+                className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition-all whitespace-nowrap active:scale-98"
+              >
+                Clear Test Data & Go Live
+              </button>
+            </div>
+
             {/* Top Tier Financial Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl shadow-xs">

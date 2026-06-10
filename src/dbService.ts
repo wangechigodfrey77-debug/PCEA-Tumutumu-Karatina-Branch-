@@ -83,44 +83,10 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (whitelist): ', err?.message || err);
   }
 
-  // 2. Patients & cascading datasets (checks if existing database has fewer than 15 patients or is missing seed data)
-  let shouldForceUpgrade = false;
-  try {
-    const patSnap = await getDocs(collection(db, 'patients'));
-    if (patSnap.size < 15) {
-      shouldForceUpgrade = true;
-      console.log('Fewer than 15 patients found, seeding full 30-patient dataset...');
-      const batch = writeBatch(db);
-      defaultPatients.forEach((p) => {
-        const d = doc(db, 'patients', p.id);
-        batch.set(d, p);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (patients): ', err?.message || err);
-  }
-
-  // 3. Lab Tests
-  try {
-    const labSnap = await getDocs(collection(db, 'labTests'));
-    if (labSnap.size < 8 || shouldForceUpgrade) {
-      console.log('Seeding labTests to Firestore...');
-      const batch = writeBatch(db);
-      defaultLabTests.forEach((t) => {
-        const d = doc(db, 'labTests', t.id);
-        batch.set(d, t);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (labTests): ', err?.message || err);
-  }
-
-  // 4. Pharmacy Items
+  // 2. Pharmacy Items (Preserved & seeded as essential catalogue)
   try {
     const stockSnap = await getDocs(collection(db, 'pharmacyItems'));
-    if (stockSnap.size < 5 || shouldForceUpgrade) {
+    if (stockSnap.size < 5) {
       console.log('Seeding pharmacyItems to Firestore...');
       const batch = writeBatch(db);
       defaultPharmacyStock.forEach((pi) => {
@@ -133,103 +99,7 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (pharmacyItems): ', err?.message || err);
   }
 
-  // 5. Medication Dispenses
-  try {
-    const dispSnap = await getDocs(collection(db, 'medicationDispenses'));
-    if (dispSnap.size < 8 || shouldForceUpgrade) {
-      console.log('Seeding medicationDispenses to Firestore...');
-      const batch = writeBatch(db);
-      defaultDispenses.forEach((md) => {
-        const d = doc(db, 'medicationDispenses', md.id);
-        batch.set(d, md);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (medicationDispenses): ', err?.message || err);
-  }
-
-  // 6. Duty Allocations
-  try {
-    const dutySnap = await getDocs(collection(db, 'dutyAllocations'));
-    if (dutySnap.empty) {
-      console.log('Seeding dutyAllocations to Firestore...');
-      const batch = writeBatch(db);
-      defaultDutyAllocations.forEach((da) => {
-        const d = doc(db, 'dutyAllocations', da.id);
-        batch.set(d, da);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (dutyAllocations): ', err?.message || err);
-  }
-
-  // 7. Leave Requests
-  try {
-    const leaveSnap = await getDocs(collection(db, 'leaveRequests'));
-    if (leaveSnap.empty) {
-      console.log('Seeding leaveRequests to Firestore...');
-      const batch = writeBatch(db);
-      defaultLeaveRequests.forEach((req) => {
-        const d = doc(db, 'leaveRequests', req.id);
-        batch.set(d, req);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (leaveRequests): ', err?.message || err);
-  }
-
-  // 8. Messages
-  try {
-    const msgSnap = await getDocs(collection(db, 'messages'));
-    if (msgSnap.empty) {
-      console.log('Seeding messages to Firestore...');
-      const batch = writeBatch(db);
-      defaultMessages.forEach((m) => {
-        const d = doc(db, 'messages', m.id);
-        batch.set(d, m);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (messages): ', err?.message || err);
-  }
-
-  // 9. Appointments
-  try {
-    const apptSnap = await getDocs(collection(db, 'appointments'));
-    if (apptSnap.size < 6 || shouldForceUpgrade) {
-      console.log('Seeding appointments to Firestore...');
-      const batch = writeBatch(db);
-      defaultAppointments.forEach((ap) => {
-        const d = doc(db, 'appointments', ap.id);
-        batch.set(d, ap);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (appointments): ', err?.message || err);
-  }
-
-  // 10. Expenses
-  try {
-    const expSnap = await getDocs(collection(db, 'expenses'));
-    if (expSnap.empty || shouldForceUpgrade) {
-      console.log('Seeding expenses to Firestore...');
-      const batch = writeBatch(db);
-      defaultExpenses.forEach((exp) => {
-        const d = doc(db, 'expenses', exp.id);
-        batch.set(d, exp);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Silent seeding warning (expenses): ', err?.message || err);
-  }
-
-  // 11. Lab Catalog
+  // 3. Lab Catalog (Infrastructural services catalog)
   try {
     const lcSnap = await getDocs(collection(db, 'labCatalog'));
     if (lcSnap.empty) {
@@ -300,7 +170,6 @@ export async function clearAllTestDataToGoLive() {
   const collectionsToClear = [
     'patients',
     'labTests',
-    'pharmacyItems',
     'medicationDispenses',
     'dutyAllocations',
     'leaveRequests',

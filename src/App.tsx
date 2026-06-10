@@ -109,7 +109,7 @@ export default function App() {
       setAppointments([]);
       setLabTests([]);
       setDispenses([]);
-      setStock([]);
+      setStock(HospitalDB.getPharmacyStock());
       setDuties([]);
       setLeaves([]);
       setMessages([]);
@@ -219,6 +219,7 @@ export default function App() {
       setSessionEmail(normalized);
       // Auto routing according to role
       if (foundUser.role === 'Reception') setActiveTab('records');
+      else if (foundUser.role === 'Doctor') setActiveTab('records');
       else if (foundUser.role === 'Lab') setActiveTab('lab');
       else if (foundUser.role === 'Pharmacy') setActiveTab('pharmacy');
       else setActiveTab('admin');
