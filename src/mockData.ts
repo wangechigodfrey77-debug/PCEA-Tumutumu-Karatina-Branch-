@@ -9,12 +9,11 @@ import { fullPharmacyStock } from './fullPharmacyStock';
 // Helper to load or seed localStorage
 const getStored = <T>(key: string, defaultValue: T): T => {
   if (typeof window === 'undefined') return defaultValue;
-  const isProd = localStorage.getItem('hosp_is_production_live') === 'true';
   const item = localStorage.getItem(key);
   if (item) {
     try {
       const parsed = JSON.parse(item);
-      if (!isProd && key === 'hosp_patients' && Array.isArray(parsed) && parsed.length < 15) {
+      if (key === 'hosp_patients' && Array.isArray(parsed) && parsed.length < 15) {
         console.log("Upgraded patient seed dataset detected (< 15 patients). Upgrading local storage to 30 patients...");
         localStorage.removeItem('hosp_patients');
         localStorage.removeItem('hosp_lab_tests');
@@ -26,11 +25,6 @@ const getStored = <T>(key: string, defaultValue: T): T => {
     } catch (e) {
       console.error("Error parsing key: ", key, e);
     }
-  }
-  if (isProd) {
-    if (key === 'hosp_whitelist') return defaultWhitelist as unknown as T;
-    if (key === 'hosp_pharmacy_stock' || key === 'hosp_lab_catalog') return defaultValue;
-    return [] as unknown as T;
   }
   return defaultValue;
 };

@@ -32,6 +32,8 @@ export function PharmacyView({
   onUpdateThreshold,
 }: PharmacyViewProps) {
   const [dispensePatientId, setDispensePatientId] = useState<string>('');
+  const [isWalkIn, setIsWalkIn] = useState<boolean>(false);
+  const [walkInName, setWalkInName] = useState<string>('');
   const [selectedStockId, setSelectedStockId] = useState<string>('');
   const [dispenseQuantity, setDispenseQuantity] = useState<number>(1);
   const [dispensingOfficer, setDispensingOfficer] = useState<string>(userName || 'Susan Muthoni');
@@ -126,6 +128,8 @@ export function PharmacyView({
 
   // Non-Pharmaceutical dispense states
   const [nonPharmaPatientId, setNonPharmaPatientId] = useState<string>('');
+  const [isWalkInNonPharma, setIsWalkInNonPharma] = useState<boolean>(false);
+  const [walkInNonPharmaName, setWalkInNonPharmaName] = useState<string>('');
   const [selectedNonPharmaId, setSelectedNonPharmaId] = useState<string>('');
   const [nonPharmaQuantity, setNonPharmaQuantity] = useState<number>(1);
 
@@ -258,26 +262,27 @@ export function PharmacyView({
 
   const handleDispense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dispensePatientId || !selectedStockId) {
-      alert('Please select both a registered patient and a cataloged medication.');
+    if ((!isWalkIn && !dispensePatientId) || (isWalkIn && !walkInName.trim()) || !selectedStockId) {
+      alert('Please select a registered patient or enter a walk-in name, and choose a medication.');
       return;
     }
 
-    const patient = patients.find((p) => p.id === dispensePatientId);
     const item = stock.find((i) => i.id === selectedStockId);
-
-    if (!patient || !item) return;
+    if (!item) return;
 
     if (item.stockQuantity < dispenseQuantity) {
       alert(`Critical stock warnings: Insufficient inventory count for ${item.name}. Current stock is only ${item.stockQuantity} units.`);
       return;
     }
 
+    const patientNameVal = isWalkIn ? walkInName.trim() : (patients.find((p) => p.id === dispensePatientId)?.name || 'Unknown Patient');
+    const patientIdVal = isWalkIn ? 'walk-in' : dispensePatientId;
+
     const newDispense: MedicationDispense = {
       id: `DSP-${Date.now()}`,
       medicationName: item.name,
-      patientId: dispensePatientId,
-      patientName: patient.name,
+      patientId: patientIdVal,
+      patientName: patientNameVal,
       dispenseDate: pharmaDispenseDate,
       dispensedBy: dispensingOfficer,
       quantity: dispenseQuantity,
@@ -287,33 +292,35 @@ export function PharmacyView({
 
     onDispenseMedication(newDispense);
     setDispensePatientId('');
+    setWalkInName('');
     setSelectedStockId('');
     setDispenseQuantity(1);
-    alert(`Medication dispensed safely. Dispatched ${dispenseQuantity} units of ${item.name} to patient ${patient.name}.`);
+    alert(`Medication dispensed safely. Dispatched ${dispenseQuantity} units of ${item.name} to patient ${patientNameVal}.`);
   };
 
   const handleNonPharmaDispense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nonPharmaPatientId || !selectedNonPharmaId) {
-      alert('Please select both a registered patient and a cataloged supplies product.');
+    if ((!isWalkInNonPharma && !nonPharmaPatientId) || (isWalkInNonPharma && !walkInNonPharmaName.trim()) || !selectedNonPharmaId) {
+      alert('Please select a registered patient or enter a walk-in name, and choose a supply product.');
       return;
     }
 
-    const patient = patients.find((p) => p.id === nonPharmaPatientId);
     const item = stock.find((i) => i.id === selectedNonPharmaId);
-
-    if (!patient || !item) return;
+    if (!item) return;
 
     if (item.stockQuantity < nonPharmaQuantity) {
       alert(`Critical stock warnings: Insufficient inventory count for ${item.name}. Current stock is only ${item.stockQuantity} units.`);
       return;
     }
 
+    const patientNameVal = isWalkInNonPharma ? walkInNonPharmaName.trim() : (patients.find((p) => p.id === nonPharmaPatientId)?.name || 'Unknown Patient');
+    const patientIdVal = isWalkInNonPharma ? 'walk-in' : nonPharmaPatientId;
+
     const newDispense: MedicationDispense = {
       id: `DSP-${Date.now()}`,
       medicationName: item.name,
-      patientId: nonPharmaPatientId,
-      patientName: patient.name,
+      patientId: patientIdVal,
+      patientName: patientNameVal,
       dispenseDate: nonPharmaDispenseDate,
       dispensedBy: dispensingOfficer,
       quantity: nonPharmaQuantity,
@@ -323,9 +330,10 @@ export function PharmacyView({
 
     onDispenseMedication(newDispense);
     setNonPharmaPatientId('');
+    setWalkInNonPharmaName('');
     setSelectedNonPharmaId('');
     setNonPharmaQuantity(1);
-    alert(`Non-pharmaceutical supplies dispensed safely. Dispatched ${nonPharmaQuantity} units of ${item.name} to patient ${patient.name}.`);
+    alert(`Non-pharmaceutical supplies dispensed safely. Dispatched ${nonPharmaQuantity} units of ${item.name} to patient ${patientNameVal}.`);
   };
 
   const handleRestock = (e: React.FormEvent) => {
@@ -950,24 +958,51 @@ export function PharmacyView({
 
               <form onSubmit={handleDispense} className="space-y-4 text-xs">
                 <div>
-                  <label id="lbl-dispense-patient" className="block font-medium text-stone-500 mb-1">Target Patient</label>
-                  <select
-                    id="select-dispense-patient"
-                    required
-                    value={dispensePatientId}
-                    onChange={(e) => setDispensePatientId(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-emerald-500 outline-hidden"
-                  >
-                    <option value="">-- Choose Patient --</option>
-                    {patients.map((p) => {
-                      const op = p.opNumber || `OP-${(p.registeredAt ? p.registeredAt.substring(0, 7) : '2026-06')}-${p.id.split('-')[1]}`;
-                      return (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.id} | {op})
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label id="lbl-dispense-patient" className="block font-medium text-stone-500">Target Patient</label>
+                    <label className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isWalkIn}
+                        onChange={(e) => {
+                          setIsWalkIn(e.target.checked);
+                          setDispensePatientId('');
+                        }}
+                        className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                      />
+                      <span>Walk-in (Unregistered)</span>
+                    </label>
+                  </div>
+
+                  {isWalkIn ? (
+                    <input
+                      type="text"
+                      id="input-dispense-walkin-name"
+                      required
+                      placeholder="Enter Walk-In Patient Name..."
+                      value={walkInName}
+                      onChange={(e) => setWalkInName(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-emerald-500 outline-hidden"
+                    />
+                  ) : (
+                    <select
+                      id="select-dispense-patient"
+                      required
+                      value={dispensePatientId}
+                      onChange={(e) => setDispensePatientId(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-emerald-500 outline-hidden"
+                    >
+                      <option value="">-- Choose Patient --</option>
+                      {patients.map((p) => {
+                        const op = p.opNumber || `OP-${(p.registeredAt ? p.registeredAt.substring(0, 7) : '2026-06')}-${p.id.split('-')[1]}`;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.id} | {op})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -1054,24 +1089,51 @@ export function PharmacyView({
 
               <form onSubmit={handleNonPharmaDispense} className="space-y-4 text-xs">
                 <div>
-                  <label id="lbl-dispense-nonpharma-patient" className="block font-medium text-stone-500 mb-1">Target Patient</label>
-                  <select
-                    id="select-dispense-nonpharma-patient"
-                    required
-                    value={nonPharmaPatientId}
-                    onChange={(e) => setNonPharmaPatientId(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 outline-hidden"
-                  >
-                    <option value="">-- Choose Patient --</option>
-                    {patients.map((p) => {
-                      const op = p.opNumber || `OP-${(p.registeredAt ? p.registeredAt.substring(0, 7) : '2026-06')}-${p.id.split('-')[1]}`;
-                      return (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.id} | {op})
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label id="lbl-dispense-nonpharma-patient" className="block font-medium text-stone-500">Target Patient</label>
+                    <label className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isWalkInNonPharma}
+                        onChange={(e) => {
+                          setIsWalkInNonPharma(e.target.checked);
+                          setNonPharmaPatientId('');
+                        }}
+                        className="rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                      />
+                      <span>Walk-in (Unregistered)</span>
+                    </label>
+                  </div>
+
+                  {isWalkInNonPharma ? (
+                    <input
+                      type="text"
+                      id="input-dispense-nonpharma-walkin-name"
+                      required
+                      placeholder="Enter Walk-In Patient Name..."
+                      value={walkInNonPharmaName}
+                      onChange={(e) => setWalkInNonPharmaName(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 outline-hidden"
+                    />
+                  ) : (
+                    <select
+                      id="select-dispense-nonpharma-patient"
+                      required
+                      value={nonPharmaPatientId}
+                      onChange={(e) => setNonPharmaPatientId(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 outline-hidden"
+                    >
+                      <option value="">-- Choose Patient --</option>
+                      {patients.map((p) => {
+                        const op = p.opNumber || `OP-${(p.registeredAt ? p.registeredAt.substring(0, 7) : '2026-06')}-${p.id.split('-')[1]}`;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.id} | {op})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
                 </div>
 
                 <div>

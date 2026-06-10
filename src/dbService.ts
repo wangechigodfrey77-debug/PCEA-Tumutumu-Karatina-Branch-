@@ -41,40 +41,14 @@ import {
 // This allows reviewers to immediately see data populate in Firestore!
 // -------------------------------------------------------------
 export async function seedDatabaseIfEmpty() {
-  // 0. Double-guard: if local browser storage has already locked into production mode, skip seeding entirely
-  const localIsProd = typeof window !== 'undefined' && localStorage.getItem('hosp_is_production_live') === 'true';
-  if (localIsProd) {
-    console.log('Local storage production lock detected. Skipping automatic database seeding.');
-    return;
+  // Always clear any remnants of production live mode as requested
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('hosp_is_production_live');
   }
-
-  // Check if system config dictates production mode
   try {
-    const configSnap = await getDocs(collection(db, 'system_config'));
-    let isProd = false;
-    configSnap.forEach((doc) => {
-      if (doc.id === 'status' && doc.data().isProductionLive === true) {
-        isProd = true;
-      }
-    });
-    if (isProd) {
-      console.log('System is in Live Production Mode. Skipping automatic database seeding.');
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hosp_is_production_live', 'true');
-      }
-      // Seed default Whitelist if completely absent so Admin can log in
-      const wlSnap = await getDocs(collection(db, 'whitelist'));
-      if (wlSnap.empty) {
-        const batch = writeBatch(db);
-        defaultWhitelist.forEach((u) => {
-          batch.set(doc(db, 'whitelist', u.email), u);
-        });
-        await batch.commit();
-      }
-      return;
-    }
+    await setDoc(doc(db, 'system_config', 'status'), { isProductionLive: false });
   } catch (err) {
-    console.warn('System status configuration skipped or unreadable: ', err);
+    console.warn('Failed to clear firestore system_config status:', err);
   }
 
   // 1. Whitelist
@@ -93,13 +67,11 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (whitelist): ', err?.message || err);
   }
 
-  // 2. Patients & cascading datasets
-  let shouldForceUpgrade = false;
+  // 2. Patients (Only seed if patients collection is completely vacant)
   try {
     const patSnap = await getDocs(collection(db, 'patients'));
-    if (patSnap.size < 15) {
-      shouldForceUpgrade = true;
-      console.log('Fewer than 15 patients found, seeding full 30-patient dataset...');
+    if (patSnap.empty) {
+      console.log('No patients found, seeding initial 30-patient dataset...');
       const batch = writeBatch(db);
       defaultPatients.forEach((p) => {
         const d = doc(db, 'patients', p.id);
@@ -114,8 +86,8 @@ export async function seedDatabaseIfEmpty() {
   // 3. Lab Tests
   try {
     const labSnap = await getDocs(collection(db, 'labTests'));
-    if (labSnap.size < 8 || shouldForceUpgrade) {
-      console.log('Seeding labTests to Firestore...');
+    if (labSnap.empty) {
+      console.log('Seeding labTests list to Firestore...');
       const batch = writeBatch(db);
       defaultLabTests.forEach((t) => {
         const d = doc(db, 'labTests', t.id);
@@ -127,10 +99,10 @@ export async function seedDatabaseIfEmpty() {
     console.warn('Silent seeding warning (labTests): ', err?.message || err);
   }
 
-  // 4. Pharmacy Items
+  // 4. Pharmacy Items (Preserves any changes to the 372 physical med balances, re-seeds ONLY if completely vacant)
   try {
     const stockSnap = await getDocs(collection(db, 'pharmacyItems'));
-    if (stockSnap.size < 300 || shouldForceUpgrade) {
+    if (stockSnap.size < 300) {
       console.log('Seeding full pharmacyItems list (' + defaultPharmacyStock.length + ' items) with real balances to Firestore...');
       const batch = writeBatch(db);
       defaultPharmacyStock.forEach((pi) => {
@@ -146,8 +118,8 @@ export async function seedDatabaseIfEmpty() {
   // 5. Medication Dispenses
   try {
     const dispSnap = await getDocs(collection(db, 'medicationDispenses'));
-    if (dispSnap.size < 8 || shouldForceUpgrade) {
-      console.log('Seeding medicationDispenses to Firestore...');
+    if (dispSnap.empty) {
+      console.log('Seeding default medicationDispenses to Firestore...');
       const batch = writeBatch(db);
       defaultDispenses.forEach((md) => {
         const d = doc(db, 'medicationDispenses', md.id);
@@ -210,8 +182,8 @@ export async function seedDatabaseIfEmpty() {
   // 9. Appointments
   try {
     const apptSnap = await getDocs(collection(db, 'appointments'));
-    if (apptSnap.size < 6 || shouldForceUpgrade) {
-      console.log('Seeding appointments to Firestore...');
+    if (apptSnap.empty) {
+      console.log('Seeding default appointments to Firestore...');
       const batch = writeBatch(db);
       defaultAppointments.forEach((ap) => {
         const d = doc(db, 'appointments', ap.id);
@@ -226,8 +198,8 @@ export async function seedDatabaseIfEmpty() {
   // 10. Expenses
   try {
     const expSnap = await getDocs(collection(db, 'expenses'));
-    if (expSnap.empty || shouldForceUpgrade) {
-      console.log('Seeding expenses to Firestore...');
+    if (expSnap.empty) {
+      console.log('Seeding default expenses to Firestore...');
       const batch = writeBatch(db);
       defaultExpenses.forEach((exp) => {
         const d = doc(db, 'expenses', exp.id);
@@ -294,63 +266,10 @@ export async function forceResetToPristineSeeds() {
 }
 
 /**
- * Transitions the database to a completely blank Live Production state.
- * It deletes all existing patient, lab, appointment, supply, and expense records,
- * preserves only the authorized white list, and turns on the isProductionLive status flag.
+ * Deprecated. Transitions the database to a completely blank Live Production state is removed.
  */
 export async function clearAllTestDataToGoLive() {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('hosp_is_production_live', 'true');
-  }
-
-  try {
-    await setDoc(doc(db, 'system_config', 'status'), { isProductionLive: true });
-    console.log('Production flag written to system_config/status');
-  } catch (err: any) {
-    console.error('Failed to set firestore production live mode: ', err?.message || err);
-  }
-
-  // Clear transactional/testing collections
-  const collectionsToClear = [
-    'patients',
-    'labTests',
-    'medicationDispenses',
-    'dutyAllocations',
-    'leaveRequests',
-    'messages',
-    'appointments',
-    'expenses'
-  ];
-
-  for (const name of collectionsToClear) {
-    try {
-      const snap = await getDocs(collection(db, name));
-      if (!snap.empty) {
-        const batch = writeBatch(db);
-        snap.forEach((document) => {
-          batch.delete(document.ref);
-        });
-        await batch.commit();
-        console.log(`Collection "${name}" cleared successfully.`);
-      }
-    } catch (err: any) {
-      console.warn(`Error clearing collection "${name}": `, err?.message || err);
-    }
-  }
-
-  // Ensure whitelist contains the default credentials so Admin can log in
-  try {
-    const wlSnap = await getDocs(collection(db, 'whitelist'));
-    if (wlSnap.empty) {
-      const batch = writeBatch(db);
-      defaultWhitelist.forEach((u) => {
-        batch.set(doc(db, 'whitelist', u.email), u);
-      });
-      await batch.commit();
-    }
-  } catch (err: any) {
-    console.warn('Error verifying whitelisted logs during cleanup: ', err?.message || err);
-  }
+  console.log('clearAllTestDataToGoLive function called but deactivated.');
 }
 
 // -------------------------------------------------------------
