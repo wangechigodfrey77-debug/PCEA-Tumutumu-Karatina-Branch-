@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Microscope, 
   HelpCircle, 
@@ -281,6 +282,64 @@ export function LabView({
       };
       reader.readAsText(file);
 
+    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      setIsParsing(true);
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+          const parsedRows: Record<string, string>[] = rawRows.map(row => {
+            const newRow: Record<string, string> = {};
+            for (const key of Object.keys(row)) {
+              const cleanKey = key.trim().toLowerCase();
+              const val = row[key];
+              newRow[cleanKey] = val !== undefined && val !== null ? String(val) : '';
+            }
+            return newRow;
+          });
+
+          if (parsedRows.length === 0) {
+            setUploadFeedback({ success: false, message: 'Vacant or empty Excel sheet.' });
+            setIsParsing(false);
+            return;
+          }
+
+          let addedCount = 0;
+          parsedRows.forEach((row) => {
+            const nameKey = Object.keys(row).find(k => k.includes('name') || k.includes('test') || k.includes('panel') || k.includes('diagnostic'));
+            const feeKey = Object.keys(row).find(k => k.includes('fee') || k.includes('price') || k.includes('charge') || k.includes('cost') || k.includes('ksh'));
+
+            const foundName = nameKey ? row[nameKey] : undefined;
+            const foundFee = feeKey ? parseFloat(row[feeKey].replace(/[^0-9.]/g, '')) : 500;
+
+            if (foundName && foundName.trim()) {
+              if (onAddLabCatalogItem) {
+                onAddLabCatalogItem({
+                  id: `LC-${Math.floor(10000 + Math.random() * 90000)}`,
+                  name: foundName.trim(),
+                  fee: isNaN(foundFee) ? 500 : foundFee
+                });
+                addedCount++;
+              }
+            }
+          });
+
+          setUploadFeedback({ 
+            success: true, 
+            message: `Extracted ${addedCount} test panel profiles from Excel sheet successfully.` 
+          });
+        } catch (err: any) {
+          setUploadFeedback({ success: false, message: `Excel upload error: ${err.message}` });
+        } finally {
+          setIsParsing(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+
     } else if (file.name.endsWith('.pdf')) {
       setIsParsing(true);
       reader.onload = async (e) => {
@@ -329,7 +388,7 @@ export function LabView({
       };
       reader.readAsDataURL(file);
     } else {
-      setUploadFeedback({ success: false, message: 'Invalid file extension. Please select a spreadsheet (.csv) or an official pricing sheet (.pdf).' });
+      setUploadFeedback({ success: false, message: 'Invalid file extension. Please select a spreadsheet (.csv/.xlsx/.xls) or an official pricing sheet (.pdf).' });
     }
   };
 
@@ -574,7 +633,7 @@ export function LabView({
                   Bulk Upload Clinical Diagnostic Panels & Prices
                 </h4>
                 <p className="text-[11px] text-stone-500 mb-3">
-                  Upload high-volume lab tests, diagnostic directories, or laboratory pricing booklets. Accepts <strong>.csv spreadsheets</strong> or <strong>PDF documents</strong>. AI handles PDF conversion automatically.
+                  Upload high-volume lab tests, diagnostic directories, or laboratory pricing booklets. Accepts <strong>Excel/CSV spreadsheets</strong> or <strong>PDF documents</strong>. AI handles PDF conversion automatically.
                 </p>
 
                 <div
@@ -594,7 +653,7 @@ export function LabView({
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    accept=".csv, .pdf"
+                    accept=".csv, .pdf, .xlsx, .xls"
                     className="hidden"
                   />
                   {isParsing ? (

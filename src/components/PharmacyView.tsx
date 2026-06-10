@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Pill, RotateCcw, Plus, ShoppingBag, PackageOpen, AlertTriangle, TrendingUp, CalendarDays, Upload, FileSpreadsheet, FileText, Check, Loader2 } from 'lucide-react';
 import { MedicationDispense, PharmacyItem, Patient } from '../types';
 
@@ -340,6 +341,83 @@ export function PharmacyView({
       };
       reader.readAsText(file);
 
+    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      setIsParsing(true);
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+          const parsedRows: Record<string, string>[] = rawRows.map(row => {
+            const newRow: Record<string, string> = {};
+            for (const key of Object.keys(row)) {
+              const cleanKey = key.trim().toLowerCase();
+              const val = row[key];
+              newRow[cleanKey] = val !== undefined && val !== null ? String(val) : '';
+            }
+            return newRow;
+          });
+
+          if (parsedRows.length === 0) {
+            setUploadFeedback({ success: false, message: 'Vacant or empty Excel sheet.' });
+            setIsParsing(false);
+            return;
+          }
+
+          let addedCount = 0;
+          parsedRows.forEach((row) => {
+            const nameKey = Object.keys(row).find(k => k.includes('name') || k.includes('medication') || k.includes('product') || k.includes('item'));
+            const priceKey = Object.keys(row).find(k => k.includes('price') || k.includes('cost') || k.includes('rate') || k.includes('ksh'));
+            const qtyKey = Object.keys(row).find(k => k.includes('qty') || k.includes('quantity') || k.includes('stock') || k.includes('intake') || k.includes('amount'));
+            const catKey = Object.keys(row).find(k => k.includes('category') || k.includes('type') || k.includes('class'));
+            const threshKey = Object.keys(row).find(k => k.includes('threshold') || k.includes('min') || k.includes('warning'));
+
+            const foundName = nameKey ? row[nameKey] : undefined;
+            const foundPrice = priceKey ? parseFloat(row[priceKey].replace(/[^0-9.]/g, '')) : 50;
+            const foundQty = qtyKey ? parseInt(row[qtyKey].replace(/[^0-9]/g, '')) : 100;
+            const foundCat = catKey ? row[catKey] : undefined;
+            const foundThresh = threshKey ? parseInt(row[threshKey].replace(/[^0-9]/g, '')) : 15;
+
+            let finalCat = 'Antibiotics';
+            if (foundCat && ['Antibiotics', 'Analgesics', 'Anti-malarials', 'Anti-histamines', 'Supplements', 'Non-Pharmaceutical'].includes(foundCat.trim())) {
+              finalCat = foundCat.trim();
+            } else {
+              const lowerName = (foundName || '').toLowerCase();
+              if (lowerName.includes('bandage') || lowerName.includes('syringe') || lowerName.includes('glove') || lowerName.includes('cotton') || lowerName.includes('needle') || lowerName.includes('swab') || lowerName.includes('tape') || lowerName.includes('infusion')) {
+                finalCat = 'Non-Pharmaceutical';
+              }
+            }
+
+            if (foundName && foundName.trim()) {
+              const newItem: PharmacyItem = {
+                id: finalCat === 'Non-Pharmaceutical' ? `NP-${Math.floor(Math.random() * 900 + 100)}` : `RX-${Math.floor(Math.random() * 900 + 100)}`,
+                name: foundName.trim(),
+                price: isNaN(foundPrice) ? 50 : foundPrice,
+                stockQuantity: isNaN(foundQty) ? 100 : foundQty,
+                category: finalCat,
+                minThreshold: isNaN(foundThresh) ? 15 : foundThresh,
+              };
+
+              onAddNewStockItem(newItem);
+              addedCount++;
+            }
+          });
+
+          setUploadFeedback({ 
+            success: true, 
+            message: `Extracted ${addedCount} products/supplies from Excel sheet successfully.` 
+          });
+        } catch (err: any) {
+          setUploadFeedback({ success: false, message: `Excel upload error: ${err.message}` });
+        } finally {
+          setIsParsing(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+
     } else if (file.name.endsWith('.pdf')) {
       setIsParsing(true);
       reader.onload = async (e) => {
@@ -392,7 +470,7 @@ export function PharmacyView({
       };
       reader.readAsDataURL(file);
     } else {
-      setUploadFeedback({ success: false, message: 'Invalid file format. Select a .csv spreadsheet or a .pdf price sheet.' });
+      setUploadFeedback({ success: false, message: 'Invalid file format. Select a .csv spreadsheet, an Excel sheet (.xlsx/.xls) or a .pdf price sheet.' });
     }
   };
 
@@ -867,7 +945,7 @@ export function PharmacyView({
                 Bulk Stock Catalog Loader
               </h4>
               <p className="text-[10px] text-stone-500 mb-3">
-                Quickly add dynamic medications, prices & consumable medical supplies in high volume using <strong>.csv spreadsheets</strong> or official <strong>PDF catalogs</strong>.
+                Quickly add dynamic medications, prices & consumable medical supplies in high volume using <strong>Excel/CSV spreadsheets</strong> or official <strong>PDF catalogs</strong>.
               </p>
 
               <div
@@ -887,7 +965,7 @@ export function PharmacyView({
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept=".csv, .pdf"
+                  accept=".csv, .pdf, .xlsx, .xls"
                   className="hidden"
                 />
                 {isParsing ? (
@@ -904,7 +982,7 @@ export function PharmacyView({
                     <div className="text-[11px] font-medium text-stone-600 mt-1">
                       Drag files or <span className="text-emerald-600 underline text-xs font-bold">browse</span>
                     </div>
-                    <p className="text-[9px] text-stone-400 mt-0.5">Supports CSV / PDF directories</p>
+                    <p className="text-[9px] text-stone-400 mt-0.5">Supports Excel / CSV / PDF directories</p>
                   </>
                 )}
               </div>
