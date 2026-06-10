@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Tumutumu Hospital Karatina Satellite",
+  "description": "Streamlined patient registration, role-based medical records, and AI board reporting portal for PCEA Tumutumu Hospital Karatina Satellite Branch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

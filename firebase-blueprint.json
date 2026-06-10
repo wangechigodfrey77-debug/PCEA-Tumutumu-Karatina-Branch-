@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "WhitelistUser": {
+      "title": "WhitelistUser",
+      "description": "An authorized hospital staff user email and their system-level authorization role.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "The registered email address." },
+        "name": { "type": "string", "description": "Display name of the user." },
+        "role": { "type": "string", "enum": ["Admin", "Reception", "Doctor", "Lab", "Pharmacy"], "description": "Access control role of the staff member." }
+      },
+      "required": ["email", "name", "role"]
+    },
+    "MedicalRecord": {
+      "title": "MedicalRecord",
+      "description": "A single clinical diagnosis and medical history entry for a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "symptoms": { "type": "string" },
+        "diagnoses": { "type": "string" },
+        "notes": { "type": "string" },
+        "prescriptions": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "doctorEmail": { "type": "string" }
+      },
+      "required": ["id", "date", "symptoms", "diagnoses", "notes", "prescriptions", "doctorName", "doctorEmail"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "A registered patient profile containing biodata and their compiled clinical history log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The patient identification code." },
+        "name": { "type": "string", "description": "Full name of the patient." },
+        "age": { "type": "number", "description": "Age in years." },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "phone": { "type": "string", "description": "Phone contact details." },
+        "category": { "type": "string", "enum": ["General Consultation", "Consultant Clinic"] },
+        "consultantSubCategory": { "type": "string", "enum": ["Surgical", "Pediatrics", "MOPC", "Obs/Gyn"] },
+        "registeredAt": { "type": "string", "description": "Timestamp of initial registration." },
+        "registeredBy": { "type": "string", "description": "Staff email that registered this patient." },
+        "medicalHistory": { "type": "array", "description": "The history of medical records and visits." }
+      },
+      "required": ["id", "name", "age", "gender", "phone", "category", "registeredAt", "registeredBy", "medicalHistory"]
+    },
+    "LabTest": {
+      "title": "LabTest",
+      "description": "A diagnostic laboratory test request, fee, and clinical result payload.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "testName": { "type": "string" },
+        "patientName": { "type": "string" },
+        "patientId": { "type": "string" },
+        "testDate": { "type": "string" },
+        "performedBy": { "type": "string" },
+        "performedByEmail": { "type": "string" },
+        "result": { "type": "string" },
+        "fee": { "type": "number" }
+      },
+      "required": ["id", "testName", "patientName", "patientId", "testDate", "performedBy", "performedByEmail", "result", "fee"]
+    },
+    "MedicationDispense": {
+      "title": "MedicationDispense",
+      "description": "A pharmacy dispensing transaction for keeping track of medication issues.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "medicationName": { "type": "string" },
+        "patientName": { "type": "string" },
+        "patientId": { "type": "string" },
+        "dispenseDate": { "type": "string" },
+        "dispensedBy": { "type": "string" },
+        "quantity": { "type": "number" },
+        "pricePerUnit": { "type": "number" },
+        "totalCost": { "type": "number" }
+      },
+      "required": ["id", "medicationName", "patientName", "patientId", "dispenseDate", "dispensedBy", "quantity", "pricePerUnit", "totalCost"]
+    },
+    "PharmacyItem": {
+      "title": "PharmacyItem",
+      "description": "An item in the pharmacy inventory stockpile, tracking quantities and unit pricing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "stockQuantity": { "type": "number" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "minThreshold": { "type": "number", "description": "The minimum threshold quantity below which low-stock alerts are triggered." }
+      },
+      "required": ["id", "name", "stockQuantity", "price", "category"]
+    },
+    "DutyAllocation": {
+      "title": "DutyAllocation",
+      "description": "A duty roster assignment allocating a staff member to a shift, department, and date.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffEmail": { "type": "string" },
+        "staffName": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Reception", "Doctor", "Lab", "Pharmacy"] },
+        "shift": { "type": "string", "enum": ["Day Shift", "Night Shift", "On Call"] },
+        "department": { "type": "string", "enum": ["Reception", "Lab", "Pharmacy", "Clinical", "Admin"] },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "staffEmail", "staffName", "role", "shift", "department", "date"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Staff leave request tracking reason, dates range, and approval/rejection state.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffEmail": { "type": "string" },
+        "staffName": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "requestedAt": { "type": "string" }
+      },
+      "required": ["id", "staffEmail", "staffName", "startDate", "endDate", "reason", "status", "requestedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "An internal hospital memo message for notification and collaboration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "senderEmail", "senderName", "senderRole", "recipientEmail", "subject", "content", "timestamp"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "An out-patient clinical consultation scheduled slot booking and simple checkout invoice billing status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string" },
+        "patientPhone": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "category": { "type": "string", "enum": ["General Consultation", "Consultant Clinic"] },
+        "consultantSubCategory": { "type": "string", "enum": ["Surgical", "Pediatrics", "MOPC", "Obs/Gyn"] },
+        "doctorEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["Scheduled", "Completed", "Cancelled"] },
+        "billingStatus": { "type": "string", "enum": ["Unpaid", "Paid"] },
+        "billingAmount": { "type": "number" }
+      },
+      "required": ["id", "patientId", "patientName", "patientPhone", "date", "time", "category", "status", "billingStatus", "billingAmount"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "An administrative ledger expense entry for satellite branch operations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The expense unique ID." },
+        "category": { "type": "string", "enum": ["Electricity", "Water", "Security", "Other"], "description": "Ledger category." },
+        "amount": { "type": "number", "description": "Expense monetary cost in Ksh." },
+        "date": { "type": "string", "description": "Date of expense in YYYY-MM-DD format." },
+        "description": { "type": "string", "description": "Brief descriptive reason for expense record." },
+        "recordedBy": { "type": "string", "description": "Email address of recorder." },
+        "recordedAt": { "type": "string", "description": "Creation timestamp." }
+      },
+      "required": ["id", "category", "amount", "date", "description", "recordedBy", "recordedAt"]
+    }
+  },
+  "firestore": {
+    "/whitelist/{email}": {
+      "schema": "WhitelistUser",
+      "description": "Authorized staff emails mapped to roles."
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Clinical patient database records."
+    },
+    "/labTests/{testId}": {
+      "schema": "LabTest",
+      "description": "Logs of and recommendations for lab tests."
+    },
+    "/medicationDispenses/{dispenseId}": {
+      "schema": "MedicationDispense",
+      "description": "Logs of dispensed drugs."
+    },
+    "/pharmacyItems/{itemId}": {
+      "schema": "PharmacyItem",
+      "description": "Stock inventory details."
+    },
+    "/dutyAllocations/{allocationId}": {
+      "schema": "DutyAllocation",
+      "description": "Departmental duty roster schedules."
+    },
+    "/leaveRequests/{requestId}": {
+      "schema": "LeaveRequest",
+      "description": "Duty leave off-duty applications."
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Broadcast notifications and internal staff messages."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Clinic appointments and simple billing invoices."
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Ledger expenses entries for satellite branch operations."
+    }
+  }
+}

@@ -1,0 +1,321 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Strictly Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------
+    // PRimitives & Global Security Helpers
+    // -------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.email != null
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+    }
+
+    // Bootstrapped Admin concept for development
+    function isBootstrappedAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'gmaurice101@gmail.com' ||
+        request.auth.token.email == 'admin@tumutumu.org' ||
+        request.auth.token.email == 'wangechigodfrey77@gmail.com'
+      );
+    }
+
+    // Fetches role from WhitelistUser document
+    function getRole() {
+      return get(/databases/$(database)/documents/whitelist/$(request.auth.token.email)).data.role;
+    }
+
+    function hasRole(role) {
+      return isVerified() && (
+        exists(/databases/$(database)/documents/whitelist/$(request.auth.token.email)) &&
+        getRole() == role
+      );
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || hasRole('Admin');
+    }
+
+    function isDoctor() {
+      return hasRole('Doctor');
+    }
+
+    function isReception() {
+      return hasRole('Reception');
+    }
+
+    function isLab() {
+      return hasRole('Lab');
+    }
+
+    function isPharmacy() {
+      return hasRole('Pharmacy');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------
+    // 1. Whitelist Users Access Control
+    // -------------------------------------------------------------
+    function isValidWhitelistUser(data) {
+      return data.email is string && data.email.size() <= 128 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.role is string && (
+               data.role == 'Admin' ||
+               data.role == 'Reception' ||
+               data.role == 'Doctor' ||
+               data.role == 'Lab' ||
+               data.role == 'Pharmacy'
+             );
+    }
+
+    match /whitelist/{email} {
+      allow read: if isVerified();
+      allow create, update: if isAdmin() && isValidId(email) && isValidWhitelistUser(incoming());
+      allow delete: if isAdmin() && isValidId(email);
+    }
+
+    // -------------------------------------------------------------
+    // 2. Patients Records & Medical History
+    // -------------------------------------------------------------
+    function isValidPatient(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.age is int && data.age >= 0 && data.age <= 150 &&
+             data.gender is string && (data.gender == 'Male' || data.gender == 'Female' || data.gender == 'Other') &&
+             data.phone is string && data.phone.size() <= 32 &&
+             data.category is string && (data.category == 'General Consultation' || data.category == 'Consultant Clinic') &&
+             data.registeredAt is string &&
+             data.registeredBy is string &&
+             data.medicalHistory is list && data.medicalHistory.size() <= 500;
+    }
+
+    match /patients/{patientId} {
+      allow read: if isVerified();
+      allow create: if (isAdmin() || isReception() || isDoctor()) && isValidId(patientId) && isValidPatient(incoming());
+      allow update: if isVerified() && isValidId(patientId) && isValidPatient(incoming()) && (
+        isAdmin() ||
+        isDoctor() ||
+        isReception() ||
+        // Action: Update history (for Doctor) or biodata (for Reception)
+        incoming().diff(existing()).affectedKeys().hasOnly(['medicalHistory'])
+      );
+      allow delete: if isAdmin() && isValidId(patientId);
+    }
+
+    // -------------------------------------------------------------
+    // 3. Laboratory Diagnostics Tests & Results
+    // -------------------------------------------------------------
+    function isValidLabTest(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.testName is string && data.testName.size() <= 128 &&
+             data.patientName is string && data.patientName.size() <= 128 &&
+             data.patientId is string && data.patientId.size() <= 64 &&
+             data.testDate is string &&
+             data.performedBy is string &&
+             data.performedByEmail is string &&
+             data.result is string && data.result.size() <= 5000 &&
+             (data.fee is int || data.fee is float) && data.fee >= 0;
+    }
+
+    match /labTests/{testId} {
+      allow read: if isVerified();
+      allow create, update: if (isAdmin() || isLab() || isDoctor()) && isValidId(testId) && isValidLabTest(incoming());
+      allow delete: if (isAdmin() || isLab() || isDoctor()) && isValidId(testId);
+    }
+
+    // -------------------------------------------------------------
+    // 4. Medication Dispensing Records
+    // -------------------------------------------------------------
+    function isValidMedicationDispense(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.medicationName is string && data.medicationName.size() <= 128 &&
+             data.patientName is string && data.patientName.size() <= 128 &&
+             data.patientId is string && data.patientId.size() <= 64 &&
+             data.dispenseDate is string &&
+             data.dispensedBy is string &&
+             data.quantity is int && data.quantity > 0 &&
+             (data.pricePerUnit is int || data.pricePerUnit is float) && data.pricePerUnit >= 0 &&
+             (data.totalCost is int || data.totalCost is float) && data.totalCost >= 0;
+    }
+
+    match /medicationDispenses/{dispenseId} {
+      allow read: if isVerified();
+      allow create, update: if (isAdmin() || isPharmacy()) && isValidId(dispenseId) && isValidMedicationDispense(incoming());
+      allow delete: if (isAdmin() || isPharmacy()) && isValidId(dispenseId);
+    }
+
+    // -------------------------------------------------------------
+    // 5. Pharmacy Inventory Stock Control
+    // -------------------------------------------------------------
+    function isValidPharmacyItem(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.stockQuantity is int && data.stockQuantity >= 0 &&
+             (data.price is int || data.price is float) && data.price >= 0 &&
+             data.category is string && data.category.size() <= 128 &&
+             (!('minThreshold' in data) || (data.minThreshold is int && data.minThreshold >= 0));
+    }
+
+    match /pharmacyItems/{itemId} {
+      allow read: if isVerified();
+      allow create, update: if (isAdmin() || isPharmacy()) && isValidId(itemId) && isValidPharmacyItem(incoming());
+      allow delete: if (isAdmin() || isPharmacy()) && isValidId(itemId);
+    }
+
+    // -------------------------------------------------------------
+    // 6. Duty Allocated Roster Schedules
+    // -------------------------------------------------------------
+    function isValidDutyAllocation(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.staffEmail is string && data.staffEmail.size() <= 128 &&
+             data.staffName is string && data.staffName.size() <= 128 &&
+             data.role is string && (
+               data.role == 'Admin' ||
+               data.role == 'Reception' ||
+               data.role == 'Doctor' ||
+               data.role == 'Lab' ||
+               data.role == 'Pharmacy'
+             ) &&
+             data.shift is string && (
+               data.shift == 'Day Shift' ||
+               data.shift == 'Night Shift' ||
+               data.shift == 'On Call'
+             ) &&
+             data.department is string && (
+               data.department == 'Reception' ||
+               data.department == 'Lab' ||
+               data.department == 'Pharmacy' ||
+               data.department == 'Clinical' ||
+               data.department == 'Admin'
+             ) &&
+             data.date is string;
+    }
+
+    match /dutyAllocations/{allocationId} {
+      allow read: if isVerified();
+      allow create, update: if isAdmin() && isValidId(allocationId) && isValidDutyAllocation(incoming());
+      allow delete: if isAdmin() && isValidId(allocationId);
+    }
+
+    // -------------------------------------------------------------
+    // 7. Duty Leave Applications
+    // -------------------------------------------------------------
+    function isValidLeaveRequest(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.staffEmail is string && data.staffEmail.size() <= 128 &&
+             data.staffName is string && data.staffName.size() <= 128 &&
+             data.startDate is string &&
+             data.endDate is string &&
+             data.reason is string && data.reason.size() <= 2000 &&
+             data.status is string && (
+               data.status == 'Pending' ||
+               data.status == 'Approved' ||
+               data.status == 'Rejected'
+             ) &&
+             data.requestedAt is string;
+    }
+
+    match /leaveRequests/{requestId} {
+      allow read: if isVerified();
+      allow create: if isVerified() && isValidId(requestId) && isValidLeaveRequest(incoming()) && (incoming().staffEmail == request.auth.token.email || isAdmin());
+      allow update: if isVerified() && isValidId(requestId) && isValidLeaveRequest(incoming()) && (
+        isAdmin() ||
+        (existing().staffEmail == request.auth.token.email && existing().status == 'Pending' && incoming().status == 'Pending')
+      );
+      allow delete: if isAdmin() || (existing().staffEmail == request.auth.token.email && existing().status == 'Pending');
+    }
+
+    // -------------------------------------------------------------
+    // 8. Internal Collaboration Messaging & Bulletins
+    // -------------------------------------------------------------
+    function isValidMessage(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.senderEmail is string && data.senderEmail.size() <= 128 &&
+             data.senderName is string && data.senderName.size() <= 128 &&
+             data.senderRole is string &&
+             data.recipientEmail is string && data.recipientEmail.size() <= 128 &&
+             data.subject is string && data.subject.size() <= 256 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.timestamp is string;
+    }
+
+    match /messages/{messageId} {
+      // Inward access limits: Messages are readable if you are signed in
+      allow read: if isVerified();
+      allow create: if isVerified() && isValidId(messageId) && isValidMessage(incoming()) && (incoming().senderEmail == request.auth.token.email || isAdmin());
+      allow delete: if isVerified() && (existing().senderEmail == request.auth.token.email || isAdmin());
+    }
+
+    // -------------------------------------------------------------
+    // 9. consultations, appointments & billing checkout
+    // -------------------------------------------------------------
+    function isValidAppointment(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.patientId is string && data.patientId.size() <= 64 &&
+             data.patientName is string && data.patientName.size() <= 128 &&
+             data.patientPhone is string && data.patientPhone.size() <= 32 &&
+             data.date is string &&
+             data.time is string &&
+             data.category is string && (data.category == 'General Consultation' || data.category == 'Consultant Clinic') &&
+             data.status is string && (data.status == 'Scheduled' || data.status == 'Completed' || data.status == 'Cancelled') &&
+             data.billingStatus is string && (data.billingStatus == 'Unpaid' || data.billingStatus == 'Paid') &&
+             (data.billingAmount is int || data.billingAmount is float) && data.billingAmount >= 0;
+    }
+
+    function isValidExpense(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.category is string && data.category.size() <= 128 &&
+             (data.amount is int || data.amount is float) && data.amount >= 0 &&
+             data.date is string &&
+             data.description is string && data.description.size() <= 2000 &&
+             data.recordedBy is string && data.recordedBy.size() <= 128 &&
+             data.recordedAt is string && data.recordedAt.size() <= 128;
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isVerified();
+      allow create, update: if (isAdmin() || isReception() || isDoctor()) && isValidId(appointmentId) && isValidAppointment(incoming());
+      allow delete: if (isAdmin() || isReception() || isDoctor()) && isValidId(appointmentId);
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isVerified();
+      allow create, update: if isAdmin() && isValidId(expenseId) && isValidExpense(incoming());
+      allow delete: if isAdmin() && isValidId(expenseId);
+    }
+
+    // -------------------------------------------------------------
+    // 10. System Configuration Settings
+    // -------------------------------------------------------------
+    function isValidSystemConfig(data) {
+      return data.isProductionLive is bool;
+    }
+
+    match /system_config/{configId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(configId) && isValidSystemConfig(incoming());
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+  }
+}
