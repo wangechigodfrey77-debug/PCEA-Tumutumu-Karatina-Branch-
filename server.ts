@@ -241,15 +241,19 @@ Otherwise, classify under standard drug types like 'Antibiotics', 'Analgesics', 
 
     const aiResponse = await ai.models.generateContent({
       model: 'gemini-3.5-flash',
-      contents: [
-        {
-          inlineData: {
-            data: fileData,
-            mimeType: mimeType
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: fileData,
+              mimeType: mimeType
+            }
+          },
+          {
+            text: prompt
           }
-        },
-        prompt
-      ],
+        ]
+      },
       config: {
         responseMimeType: 'application/json',
         responseSchema: responseSchema,
