@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Pill, RotateCcw, Plus, ShoppingBag, PackageOpen, AlertTriangle, TrendingUp, CalendarDays, Upload, FileSpreadsheet, FileText, Check, Loader2 } from 'lucide-react';
+import { Pill, RotateCcw, Plus, ShoppingBag, PackageOpen, AlertTriangle, TrendingUp, CalendarDays, Upload, FileSpreadsheet, FileText, Check, Loader2, History, Download, Trash2, Calendar, User } from 'lucide-react';
 import { MedicationDispense, PharmacyItem, Patient } from '../types';
 
 interface PharmacyViewProps {
@@ -37,7 +37,92 @@ export function PharmacyView({
   const [dispensingOfficer, setDispensingOfficer] = useState<string>(userName || 'Susan Muthoni');
 
   // Sub-tabs state
-  const [activeSubTab, setActiveSubTab] = useState<'pharma' | 'non-pharma'>('pharma');
+  const [activeSubTab, setActiveSubTab] = useState<'pharma' | 'non-pharma' | 'ledger'>('pharma');
+
+  // Restock History state for Pharmacy Audit Trail
+  const [restockHistory, setRestockHistory] = useState<{
+    id: string;
+    itemId: string;
+    itemName: string;
+    category: string;
+    quantity: number;
+    restockDate: string;
+    restockedBy: string;
+  }[]>(() => {
+    const cached = localStorage.getItem('hosp_pharmacy_restocks');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (err) {
+        console.error("Failed to parse cached restock history: ", err);
+      }
+    }
+    const defaultRestocks = [
+      {
+        id: 'RST-103948',
+        itemId: 'RX-789',
+        itemName: 'Amoxicillin 500mg capsules',
+        category: 'Antibiotics',
+        quantity: 150,
+        restockDate: '2026-06-08',
+        restockedBy: userName || 'Susan Muthoni'
+      },
+      {
+        id: 'RST-103945',
+        itemId: 'RX-102',
+        itemName: 'Paracetamol 500mg tablets',
+        category: 'Analgesics',
+        quantity: 300,
+        restockDate: '2026-06-06',
+        restockedBy: userName || 'Susan Muthoni'
+      },
+      {
+        id: 'RST-103941',
+        itemId: 'NP-104',
+        itemName: 'Sterile Latex Surgical Gloves',
+        category: 'Non-Pharmaceutical',
+        quantity: 500,
+        restockDate: '2026-06-05',
+        restockedBy: userName || 'Susan Muthoni'
+      },
+      {
+        id: 'RST-103932',
+        itemId: 'RX-421',
+        itemName: 'Artemether-Lumefantrine (Coartem)',
+        category: 'Anti-malarials',
+        quantity: 100,
+        restockDate: '2026-06-02',
+        restockedBy: userName || 'Susan Muthoni'
+      }
+    ];
+    localStorage.setItem('hosp_pharmacy_restocks', JSON.stringify(defaultRestocks));
+    return defaultRestocks;
+  });
+
+  const handleRestockWithAudit = (itemId: string, qty: number) => {
+    onRestockItem(itemId, qty);
+
+    const item = stock.find(i => i.id === itemId);
+    if (!item) return;
+
+    const newRestock = {
+      id: `RST-${Math.floor(100000 + Math.random() * 900000)}`,
+      itemId: item.id,
+      itemName: item.name,
+      category: item.category,
+      quantity: qty,
+      restockDate: new Date().toISOString().split('T')[0],
+      restockedBy: userName || 'Susan Muthoni'
+    };
+
+    const updated = [newRestock, ...restockHistory];
+    setRestockHistory(updated);
+    localStorage.setItem('hosp_pharmacy_restocks', JSON.stringify(updated));
+  };
+
+  // Ledger Filter states
+  const [ledgerFilterType, setLedgerFilterType] = useState<'ALL' | 'DISPENSE' | 'RESTOCK'>('ALL');
+  const [ledgerSearchQuery, setLedgerSearchQuery] = useState<string>('');
 
   // Non-Pharmaceutical dispense states
   const [nonPharmaPatientId, setNonPharmaPatientId] = useState<string>('');
@@ -120,6 +205,57 @@ export function PharmacyView({
   const totalLowStockCount = stock.filter((item) => item.stockQuantity <= (item.minThreshold ?? 15)).length;
   const criticalOutOfStockCount = stock.filter((item) => item.stockQuantity === 0).length;
 
+  // Merge dispenses & restocks into a single feed
+  const unifiedEntries = [
+    ...dispenses.map(d => ({
+      id: d.id,
+      type: 'DISPENSE' as const,
+      timestamp: d.dispenseDate,
+      itemName: d.medicationName,
+      itemId: '',
+      quantity: d.quantity,
+      operator: d.dispensedBy,
+      partyName: d.patientName,
+      unitPrice: d.pricePerUnit,
+      totalValue: d.totalCost
+    })),
+    ...restockHistory.map(r => ({
+      id: r.id,
+      type: 'RESTOCK' as const,
+      timestamp: r.restockDate,
+      itemName: r.itemName,
+      itemId: r.itemId,
+      quantity: r.quantity,
+      operator: r.restockedBy,
+      partyName: r.category,
+      unitPrice: 0,
+      totalValue: 0
+    }))
+  ];
+
+  // Sort chronologically (latest date first)
+  const sortedEntries = [...unifiedEntries].sort((a, b) => {
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() || b.id.localeCompare(a.id);
+  });
+
+  // Filter entries
+  const filteredLedgerEntries = sortedEntries.filter(entry => {
+    // Type filter
+    if (ledgerFilterType !== 'ALL' && entry.type !== ledgerFilterType) {
+      return false;
+    }
+    // Search query filter
+    if (ledgerSearchQuery.trim()) {
+      const q = ledgerSearchQuery.toLowerCase();
+      const matchName = entry.itemName.toLowerCase().includes(q);
+      const matchOp = entry.operator.toLowerCase().includes(q);
+      const matchId = entry.id.toLowerCase().includes(q) || (entry.itemId || '').toLowerCase().includes(q);
+      const matchParty = (entry.partyName || '').toLowerCase().includes(q);
+      return matchName || matchOp || matchId || matchParty;
+    }
+    return true;
+  });
+
   const handleDispense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dispensePatientId || !selectedStockId) {
@@ -197,7 +333,7 @@ export function PharmacyView({
     if (!restockStockId) return;
 
     if (restockQty > 0) {
-      onRestockItem(restockStockId, restockQty);
+      handleRestockWithAudit(restockStockId, restockQty);
     }
     if (onUpdateThreshold) {
       onUpdateThreshold(restockStockId, thresholdVal);
@@ -528,14 +664,14 @@ export function PharmacyView({
       </div>
 
       {/* Tab select control */}
-      <div className="flex border-b border-stone-200">
+      <div className="flex flex-wrap border-b border-stone-200">
         <button
           id="btn-subtab-pharma"
           type="button"
           onClick={() => setActiveSubTab('pharma')}
           className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold transition-all border-b-2 mr-4 ${
             activeSubTab === 'pharma'
-              ? 'border-emerald-600 text-emerald-700'
+              ? 'border-emerald-600 text-emerald-700 font-bold'
               : 'border-transparent text-stone-500 hover:text-stone-700'
           }`}
         >
@@ -546,18 +682,263 @@ export function PharmacyView({
           id="btn-subtab-nonpharma"
           type="button"
           onClick={() => setActiveSubTab('non-pharma')}
-          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold transition-all border-b-2 ${
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold transition-all border-b-2 mr-4 ${
             activeSubTab === 'non-pharma'
-              ? 'border-indigo-600 text-indigo-700'
+              ? 'border-indigo-600 text-indigo-700 font-bold'
               : 'border-transparent text-stone-500 hover:text-stone-700'
           }`}
         >
           <PackageOpen className="w-4 h-4 text-indigo-600" />
           Non-Pharmaceutical Supplies ({nonPharmaItems.length} items)
         </button>
+        <button
+          id="btn-subtab-ledger"
+          type="button"
+          onClick={() => setActiveSubTab('ledger')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold transition-all border-b-2 ${
+            activeSubTab === 'ledger'
+              ? 'border-amber-600 text-amber-700 font-bold'
+              : 'border-transparent text-stone-500 hover:text-stone-700'
+          }`}
+        >
+          <History className="w-4 h-4 text-amber-600" />
+          Audit Ledger & Logs ({dispenses.length + restockHistory.length} events)
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {activeSubTab === 'ledger' ? (
+        <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm leading-relaxed space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-md font-bold text-stone-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-amber-600 shrink-0" />
+                Comprehensive Pharmacy Audit Trail & Ledger
+              </h3>
+              <p className="text-xs text-stone-500 mt-1 pb-1">
+                A regulatory chronological ledger documenting all medical inventory dispatches (patient dispenses) and restocking supply activities at Karatina Satellite.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-export-ledger"
+                type="button"
+                onClick={() => {
+                  const headers = ['Ledger ID', 'Event Type', 'Timestamp', 'Product Name', 'Quantity', 'Inflow/Outflow', 'Staff / Operator', 'Recipient / Details', 'Value (Ksh)'];
+                  const rows = sortedEntries.map(entry => [
+                    entry.id,
+                    entry.type,
+                    entry.timestamp,
+                    entry.itemName,
+                    entry.quantity,
+                    entry.type === 'RESTOCK' ? 'INFLOW (Restock)' : 'OUTFLOW (Dispense)',
+                    entry.operator,
+                    entry.partyName || 'N/A',
+                    entry.totalValue ? `Ksh ${entry.totalValue}` : 'N/A'
+                  ]);
+
+                  const csvContent = "data:text/csv;charset=utf-8," 
+                    + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+                  
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", `Pharmacy_Audit_Ledger_${new Date().toISOString().split('T')[0]}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="bg-stone-50 hover:bg-stone-100 text-stone-700 font-semibold text-xs py-2 px-4 rounded-lg border border-stone-200 transition flex items-center gap-1.5 cursor-pointer font-sans"
+              >
+                <Download className="w-3.5 h-3.5 text-stone-500" />
+                Export CSV Ledger
+              </button>
+              <button
+                id="btn-clear-ledger"
+                type="button"
+                onClick={() => {
+                  if (confirm("Are you sure you want to reset restock history to seeds? (Dispenses are kept in Firestore/sync state)")) {
+                    localStorage.removeItem('hosp_pharmacy_restocks');
+                    window.location.reload();
+                  }
+                }}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs py-2 px-3 rounded-lg border border-rose-200 transition flex items-center gap-1 cursor-pointer font-sans"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Reset Restocks
+              </button>
+            </div>
+          </div>
+
+          {/* Core Analytics Banner inside Audit tab */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-stone-50 border border-stone-150 rounded-xl font-sans text-xs">
+            <div className="space-y-1">
+              <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider block">Total Logged Entries</span>
+              <strong className="text-lg font-bold text-stone-900">{dispenses.length + restockHistory.length}</strong>
+              <span className="text-[9px] text-stone-500 block">Dispenses & Restocks</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider block">Dispenses Recorded</span>
+              <strong className="text-lg font-bold text-indigo-700">{dispenses.length}</strong>
+              <span className="text-[9px] text-emerald-600 block">Ksh {dispenses.reduce((sum, d) => sum + d.totalCost, 0).toLocaleString()} Value</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider block">Replenishments Recorded</span>
+              <strong className="text-lg font-bold text-emerald-700">{restockHistory.length}</strong>
+              <span className="text-[9px] text-stone-500 block">Across {new Set(restockHistory.map(r => r.itemId)).size} unique items</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider block">Latest Action Date</span>
+              <strong className="text-lg font-bold text-amber-700 font-mono">
+                {(() => {
+                  const sorted = [...dispenses.map(d => d.dispenseDate), ...restockHistory.map(r => r.restockDate)].sort();
+                  return sorted.length > 0 ? sorted[sorted.length - 1] : 'N/A';
+                })()}
+              </strong>
+              <span className="text-[9px] text-stone-550 block font-mono">Audit Log is Active</span>
+            </div>
+          </div>
+
+          {/* Ledger filters and search */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-sans">
+            <div className="flex items-center gap-1.5 p-1 bg-stone-100 rounded-lg w-fit">
+              <button
+                type="button"
+                onClick={() => setLedgerFilterType('ALL')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                  ledgerFilterType === 'ALL' ? 'bg-white text-stone-800 shadow-xs font-bold' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                All Activities ({dispenses.length + restockHistory.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLedgerFilterType('DISPENSE')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                  ledgerFilterType === 'DISPENSE' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-stone-500 hover:text-indigo-600'
+                }`}
+              >
+                Dispenses Only ({dispenses.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLedgerFilterType('RESTOCK')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                  ledgerFilterType === 'RESTOCK' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-stone-500 hover:text-emerald-600'
+                }`}
+              >
+                Replenishments Only ({restockHistory.length})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Filter by product, patient, staff..."
+                  value={ledgerSearchQuery}
+                  onChange={(e) => setLedgerSearchQuery(e.target.value)}
+                  className="bg-stone-50 border border-stone-200 rounded-lg py-2 pl-3 pr-8 w-64 focus:ring-1 focus:ring-amber-500 outline-hidden font-sans"
+                />
+                {ledgerSearchQuery && (
+                  <button
+                    onClick={() => setLedgerSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600 font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Unified Ledger Table */}
+          <div className="overflow-x-auto border border-stone-150 rounded-xl font-sans">
+            <table className="w-full text-left text-xs font-sans">
+              <thead className="bg-stone-50 text-stone-500 font-bold border-b border-stone-200">
+                <tr>
+                  <th className="p-3">Reference ID</th>
+                  <th className="p-3">Event Date</th>
+                  <th className="p-3">Action Type</th>
+                  <th className="p-3">Product Name / Item</th>
+                  <th className="p-3">Staff / Officer</th>
+                  <th className="p-3 text-center">Change Qty</th>
+                  <th className="p-3">Beneficiary / Details</th>
+                  <th className="p-3 text-right">Value Impact</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-stone-700">
+                {filteredLedgerEntries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-stone-50/55 transition">
+                    <td className="p-3 font-mono text-stone-400">{entry.id}</td>
+                    <td className="p-3 font-mono whitespace-nowrap text-stone-600">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                        {entry.timestamp}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {entry.type === 'RESTOCK' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Stock Replenish
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          Medication Dispense
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 font-semibold text-stone-800">
+                      <span className="flex items-center gap-1.5">
+                        {entry.type === 'RESTOCK' ? (
+                          <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Pill className="w-3.5 h-3.5 text-indigo-600" />
+                        )}
+                        {entry.itemName}
+                      </span>
+                    </td>
+                    <td className="p-3 text-stone-600">
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3 text-stone-400 shrink-0" />
+                        {entry.operator}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center font-bold">
+                      {entry.type === 'RESTOCK' ? (
+                        <span className="text-emerald-750 font-mono font-bold">+{entry.quantity}</span>
+                      ) : (
+                        <span className="text-red-600 font-mono font-bold">-{entry.quantity}</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-stone-600 text-xs">
+                      {entry.type === 'RESTOCK' ? (
+                        <span className="text-stone-500 italic">Cat: {entry.partyName}</span>
+                      ) : (
+                        <span className="font-semibold text-stone-700">Patient: {entry.partyName}</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-stone-900">
+                      {entry.type === 'RESTOCK' ? (
+                        <span className="text-stone-400 font-normal">-</span>
+                      ) : (
+                        <span>Ksh {entry.totalValue?.toLocaleString()}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filteredLedgerEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-stone-400 font-medium">
+                      No matching audit trails found. Customize filters or add activities.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Dispense Panel */}
         <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm leading-relaxed h-fit">
           {activeSubTab === 'pharma' ? (
@@ -897,7 +1278,7 @@ export function PharmacyView({
                             id={`btn-row-restock-${item.id}`}
                             type="button"
                             onClick={() => {
-                              onRestockItem(item.id, 50);
+                              handleRestockWithAudit(item.id, 50);
                               alert(`Successfully replenished +50 units of ${item.name}.`);
                             }}
                             className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-900 text-[10px] px-2 py-0.5 rounded transition cursor-pointer font-bold"
@@ -1170,6 +1551,7 @@ export function PharmacyView({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

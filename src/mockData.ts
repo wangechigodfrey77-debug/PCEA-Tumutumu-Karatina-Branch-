@@ -4,6 +4,7 @@
  */
 
 import { WhitelistUser, Patient, LabTest, LabCatalogItem, MedicationDispense, PharmacyItem, DutyAllocation, LeaveRequest, Message, Appointment, Expense } from './types';
+import { fullPharmacyStock } from './fullPharmacyStock';
 
 // Helper to load or seed localStorage
 const getStored = <T>(key: string, defaultValue: T): T => {
@@ -852,23 +853,7 @@ export const defaultLabTests: LabTest[] = [
 ];
 
 // Seeding Default Pharmacy Inventory ITEMS
-export const defaultPharmacyStock: PharmacyItem[] = [
-  { id: 'RX-1', name: 'Artemether-Lumefantrine (Coartem)', stockQuantity: 120, price: 450, category: 'Anti-malarials', minThreshold: 30 },
-  { id: 'RX-2', name: 'Amoxicillin 500mg caps', stockQuantity: 450, price: 10, category: 'Antibiotics', minThreshold: 100 },
-  { id: 'RX-3', name: 'Paracetamol 500mg tabs', stockQuantity: 2000, price: 2, category: 'Analgesics', minThreshold: 200 },
-  { id: 'RX-4', name: 'Cetirizine 10mg tabs', stockQuantity: 500, price: 5, category: 'Anti-histamines', minThreshold: 40 },
-  { id: 'RX-5', name: 'Tramadol 50mg caps', stockQuantity: 180, price: 25, category: 'Painkillers (POM)', minThreshold: 200 },
-  { id: 'RX-6', name: 'Zinc DT (dispersible) 20mg', stockQuantity: 300, price: 15, category: 'Supplements', minThreshold: 50 },
-  { id: 'RX-7', name: 'Oral Rehydration Salts (ORS)', stockQuantity: 140, price: 60, category: 'Rehydrating agents', minThreshold: 150 },
-  { id: 'RX-8', name: 'Enalapril 5mg tabs', stockQuantity: 800, price: 12, category: 'Antihypertensives', minThreshold: 100 },
-  { id: 'RX-9', name: 'Ferosil (Iron/Folic Acid Combo)', stockQuantity: 350, price: 15, category: 'Prenatal vitamins', minThreshold: 100 },
-  { id: 'RX-10', name: 'Augmentin 625mg tabs', stockQuantity: 90, price: 120, category: 'Antibiotics', minThreshold: 100 },
-  { id: 'NP-1', name: 'Surgical Gloves (Box of 100)', stockQuantity: 85, price: 650, category: 'Non-Pharmaceutical', minThreshold: 100 },
-  { id: 'NP-2', name: 'Disposable Syringes (2ml, 100pcs)', stockQuantity: 150, price: 350, category: 'Non-Pharmaceutical', minThreshold: 50 },
-  { id: 'NP-3', name: 'Crepe Bandage (7.5cm x 4.5m)', stockQuantity: 220, price: 80, category: 'Non-Pharmaceutical', minThreshold: 50 },
-  { id: 'NP-4', name: 'Cotton Wool Roll (400g)', stockQuantity: 95, price: 240, category: 'Non-Pharmaceutical', minThreshold: 100 },
-  { id: 'NP-5', name: 'Methylated Spirit (500ml)', stockQuantity: 70, price: 280, category: 'Non-Pharmaceutical', minThreshold: 80 }
-];
+export const defaultPharmacyStock: PharmacyItem[] = fullPharmacyStock;
 
 // Seeding Default Medication Dispense Reports
 export const defaultDispenses: MedicationDispense[] = [
@@ -1192,7 +1177,13 @@ export class HospitalDB {
   }
 
   static getPharmacyStock(): PharmacyItem[] {
-    return getStored<PharmacyItem[]>('hosp_pharmacy_stock', defaultPharmacyStock);
+    const stock = getStored<PharmacyItem[]>('hosp_pharmacy_stock', defaultPharmacyStock);
+    if (Array.isArray(stock) && stock.length <= 15) {
+      console.log('Upgraded state detected: Seeding complete P.C.E.A TumuTumu Hospital drug store list...');
+      saveStored('hosp_pharmacy_stock', defaultPharmacyStock);
+      return defaultPharmacyStock;
+    }
+    return stock;
   }
 
   static savePharmacyStock(stock: PharmacyItem[]) {
