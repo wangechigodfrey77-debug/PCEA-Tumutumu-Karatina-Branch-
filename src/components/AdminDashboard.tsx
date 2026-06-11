@@ -978,63 +978,97 @@ export function AdminDashboard({
       {/* D. SECURE EMAIL WHITELIST MANAGER SCREEN */}
       {activeAdminSub === 'whitelist' && (
         <div id="admin-whitelist-submodule" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm leading-relaxed h-fit">
-            <h3 className="text-sm font-semibold text-stone-800 mb-4 flex items-center gap-2">
-              <ShieldAlert className="w-4.5 h-4.5 text-emerald-600" />
-              Whitelist New Account Email
-            </h3>
+          <div className="space-y-6 h-fit">
+            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm leading-relaxed">
+              <h3 className="text-sm font-semibold text-stone-800 mb-4 flex items-center gap-2">
+                <ShieldAlert className="w-4.5 h-4.5 text-emerald-600" />
+                Whitelist New Account Email
+              </h3>
 
-            <form onSubmit={handleAddWhitelistSubmit} className="space-y-4 text-xs">
-              <div>
-                <label id="lbl-wl-email" className="block font-medium text-stone-500 mb-1">Staff Google Email Address</label>
-                <input
-                  id="inp-wl-email"
-                  type="email"
-                  required
-                  placeholder="e.g. nurse@tumutumu.org"
-                  value={wlEmail}
-                  onChange={(e) => setWlEmail(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              <form onSubmit={handleAddWhitelistSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label id="lbl-wl-email" className="block font-medium text-stone-500 mb-1">Staff Google Email Address</label>
+                  <input
+                    id="inp-wl-email"
+                    type="email"
+                    required
+                    placeholder="e.g. nurse@tumutumu.org"
+                    value={wlEmail}
+                    onChange={(e) => setWlEmail(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
 
-              <div>
-                <label id="lbl-wl-name" className="block font-medium text-stone-500 mb-1">Staff Member Name</label>
-                <input
-                  id="inp-wl-name"
-                  type="text"
-                  required
-                  placeholder="e.g. Sister Mercy Wambugu"
-                  value={wlName}
-                  onChange={(e) => setWlName(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+                <div>
+                  <label id="lbl-wl-name" className="block font-medium text-stone-500 mb-1">Staff Member Name</label>
+                  <input
+                    id="inp-wl-name"
+                    type="text"
+                    required
+                    placeholder="e.g. Sister Mercy Wambugu"
+                    value={wlName}
+                    onChange={(e) => setWlName(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
 
-              <div>
-                <label id="lbl-wl-role" className="block font-medium text-stone-500 mb-1">Roster Role Category</label>
-                <select
-                  id="select-wl-role"
-                  value={wlRole}
-                  onChange={(e) => setWlRole(e.target.value as any)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
+                <div>
+                  <label id="lbl-wl-role" className="block font-medium text-stone-500 mb-1">Roster Role Category</label>
+                  <select
+                    id="select-wl-role"
+                    value={wlRole}
+                    onChange={(e) => setWlRole(e.target.value as any)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded p-2 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="Doctor">Doctor (Clinical Officer / consultant)</option>
+                    <option value="Reception">Reception & Records coordinator</option>
+                    <option value="Lab">Lab Technologist</option>
+                    <option value="Pharmacy">Pharmacist / Dispatcher</option>
+                    <option value="Admin">Administrator (Roster Coordinator / CFO)</option>
+                  </select>
+                </div>
+
+                <button
+                  id="btn-add-whitelist-submit"
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-all cursor-pointer"
                 >
-                  <option value="Doctor">Doctor (Clinical Officer / consultant)</option>
-                  <option value="Reception">Reception & Records coordinator</option>
-                  <option value="Lab">Lab Technologist</option>
-                  <option value="Pharmacy">Pharmacist / Dispatcher</option>
-                  <option value="Admin">Administrator (Roster Coordinator / CFO)</option>
-                </select>
-              </div>
+                  Whitelist Account Email
+                </button>
+              </form>
+            </div>
 
-              <button
-                id="btn-add-whitelist-submit"
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-all"
-              >
-                Whitelist Account Email
-              </button>
-            </form>
+            {/* Go-Live Database Purge Tool */}
+            {onClearTestDataToGoLive && (
+              <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-5 space-y-3 shadow-xs">
+                <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
+                  Database Go-Live Control
+                </h3>
+                <p className="text-[11px] text-rose-900 leading-relaxed">
+                  Ready for live clinical deployment? Click below to delete all mock patients, lab diagnostic results, messages, appointments, expenses, and trial accounts permanently.
+                </p>
+                <div className="border-t border-rose-200/60 my-1"></div>
+                <p className="text-[10px] text-rose-800 leading-relaxed font-semibold">
+                  🔒 Note: Your active administrative email ({currentUserEmail}) and developer accounts will remain whitelisted to preserve your secure superintendent access.
+                </p>
+                <button
+                  id="btn-purge-test-data"
+                  onClick={() => {
+                    const confirmPurge = confirm(
+                      "CRITICAL WARNING:\n\nAre you absolutely sure you want to PERMANENTLY DELETE all test patient files, lab diagnostic results, messages, appointments, expenses, and trial staff accounts?\n\nThis operation will place your database into a clean, empty state ready for live production and CANNOT be undone."
+                    );
+                    if (confirmPurge) {
+                      onClearTestDataToGoLive();
+                    }
+                  }}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                  Initialize Clean Production Database
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-stone-200 lg:col-span-2 space-y-4">

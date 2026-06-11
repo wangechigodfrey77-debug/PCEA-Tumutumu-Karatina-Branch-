@@ -686,41 +686,21 @@ export default function App() {
                Sign In with Google Account
             </button>
 
-            <div className="relative flex py-1.5 items-center">
-              <div className="flex-grow border-t border-stone-200"></div>
-              <span className="flex-shrink mx-4 text-stone-400 text-[9px] uppercase font-bold tracking-wider">or direct sign-in</span>
-              <div className="flex-grow border-t border-stone-200"></div>
+            {/* Live Production Environment Guidance Panel */}
+            <div className="bg-emerald-50/55 border border-emerald-100 rounded-xl p-4 space-y-2 text-[11px] text-emerald-955 leading-relaxed">
+              <h3 className="font-bold flex items-center gap-1.5 text-emerald-900 uppercase tracking-wide">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Production System Status Live
+              </h3>
+              <ul className="list-disc pl-4 space-y-1 ml-0.5">
+                <li>
+                  <strong className="text-emerald-950">Whitelisted Accounts Only:</strong> Access is restricted strictly to active staff members registered in the database. Ensure your superintendent whitelists your exact Gmail address before trying to log in.
+                </li>
+                <li>
+                  <strong className="text-emerald-950">Google Warning Info:</strong> Because our EMR is configured as an internal custom app, Google will display a <em className="italic text-rose-700">"Google hasn't verified this app"</em> safety notice. You can safely bypass this screen by clicking <strong className="font-semibold text-stone-900">"Advanced" → "Go to tumutumu.org (unsafe)"</strong>.
+                </li>
+              </ul>
             </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (inputEmail.trim()) {
-                  setSessionEmail(inputEmail.trim());
-                } else {
-                  setLoginError('Please enter a valid whitelisted email address.');
-                }
-              }}
-              className="space-y-4 text-xs"
-            >
-              <div>
-                <label className="block text-xs font-semibold text-stone-600 mb-1">Whitelisted Staff Email</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. admin@tumutumu.org"
-                  value={inputEmail}
-                  onChange={(e) => setInputEmail(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-emerald-500 outline-hidden font-mono"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 text-white hover:bg-emerald-700 py-2.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                Access Secure Portal
-              </button>
-            </form>
           </div>
         </div>
       ) : (

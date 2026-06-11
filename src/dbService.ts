@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   setDoc,
+  getDoc,
   deleteDoc,
   onSnapshot,
   getDocs,
@@ -41,7 +42,20 @@ import {
 // This allows reviewers to immediately see data populate in Firestore!
 // -------------------------------------------------------------
 export async function seedDatabaseIfEmpty() {
-  // Always clear any remnants of production live mode as requested
+  try {
+    const statusDoc = await getDoc(doc(db, 'system_config', 'status'));
+    if (statusDoc.exists() && statusDoc.data()?.isProductionLive === true) {
+      console.log('Database is in Production Live state (Firestore). Skipping database seeding.');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hosp_is_production_live', 'true');
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn('Error reading system_config status, proceeding with default bootstrapping check:', err);
+  }
+
+  // If not live, ensure local storage and firestore configurations are clean
   if (typeof window !== 'undefined') {
     localStorage.removeItem('hosp_is_production_live');
   }
@@ -266,10 +280,73 @@ export async function forceResetToPristineSeeds() {
 }
 
 /**
- * Deprecated. Transitions the database to a completely blank Live Production state is removed.
+ * Safely clears all clinical and mock user data to transition the system to a clean production space.
+ * Retains essential lookups (the 372-drug Pharmacy Items list and core Whitelist administrators).
  */
 export async function clearAllTestDataToGoLive() {
-  console.log('clearAllTestDataToGoLive function called but deactivated.');
+  // 1. Mark database as production live in Firestore so that it is never re-seeded
+  try {
+    const statusRef = doc(db, 'system_config', 'status');
+    await setDoc(statusRef, { isProductionLive: true });
+    console.log('System system_config/status set to isProductionLive: true successfully.');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hosp_is_production_live', 'true');
+    }
+  } catch (err: any) {
+    console.error('Failed to set system_config/status in Firestore:', err?.message || err);
+  }
+
+  // 2. Clear all transactional/test data collections
+  const collectionsToClear = [
+    'patients',
+    'labTests',
+    'medicationDispenses',
+    'dutyAllocations',
+    'leaveRequests',
+    'messages',
+    'appointments',
+    'expenses'
+  ];
+
+  for (const name of collectionsToClear) {
+    try {
+      const snap = await getDocs(collection(db, name));
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.forEach((document) => {
+          batch.delete(document.ref);
+        });
+        await batch.commit();
+        console.log(`Successfully cleared collection "${name}".`);
+      }
+    } catch (err: any) {
+      console.warn(`Error clearing collection "${name}" during Go Live: `, err?.message || err);
+    }
+  }
+
+  // 3. Keep `/whitelist` but delete trial accounts (Mary Wangari, James Kinyua, Peter Kagiri, Susan Muthoni)
+  // Let's keep gmaurice101@gmail.com and wangechigodfrey77@gmail.com and admin@tumutumu.org
+  try {
+    const wlSnap = await getDocs(collection(db, 'whitelist'));
+    if (!wlSnap.empty) {
+      const batch = writeBatch(db);
+      let deletedCount = 0;
+      wlSnap.forEach((doc) => {
+        const email = doc.id.toLowerCase().trim();
+        const preserveList = ['gmaurice101@gmail.com', 'admin@tumutumu.org', 'wangechigodfrey77@gmail.com'];
+        if (!preserveList.includes(email)) {
+          batch.delete(doc.ref);
+          deletedCount++;
+        }
+      });
+      if (deletedCount > 0) {
+        await batch.commit();
+        console.log(`Successfully removed ${deletedCount} trial staff emails from whitelist.`);
+      }
+    }
+  } catch (err: any) {
+    console.warn('Error trimming whitelist of trial accounts during Go Live: ', err?.message || err);
+  }
 }
 
 // -------------------------------------------------------------
